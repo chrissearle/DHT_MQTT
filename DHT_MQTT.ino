@@ -1,12 +1,12 @@
 #include <ESP8266WiFi.h>
 #include <PubSubClient.h>
-#include <DHT.h>
 
 #include <DNSServer.h>
 #include <ESP8266WebServer.h>
 #include <WiFiManager.h>
 
-#include "Configuration.h"
+#include "Board.h"
+#include "Sensor.h"
 
 #define DHTTYPE DHT22
 
@@ -23,88 +23,11 @@
 
 #define BOARD DINING
 
-#if BOARD == LOUNGE
-const char *deviceName = "lounge";
-const char *sensor1 = "lounge";
-DHT dht1(D1, DHTTYPE);
-#endif
-
-#if BOARD == BEDROOM
-const char *deviceName = "bedroom";
-const char *sensor1 = "bedroom1";
-const char *sensor2 = "hallway";
-DHT dht1(D1, DHTTYPE);
-DHT dnt2(D2, DHTTYPE);
-#define DHT2 1
-#endif
-
-#if BOARD == KITCHEN
-const char *deviceName = "kitchen";
-const char *sensor1 = "kitchen";
-const char *sensor2 = "short_hall";
-DHT dht1(D1, DHTTYPE);
-DHT dht2(D2, DHTTYPE);
-#define DHT2 1
-#endif
-
-#if BOARD == DINING
-const char *deviceName = "dining_room";
-const char *sensor1 = "dining_room";
-DHT dht1(D1, DHTTYPE);
-#endif
-
-#if BOARD == BEDROOM2
-const char *deviceName = "bedroom2";
-const char *sensor1 = "bedroom2";
-DHT dht1(D1, DHTTYPE);
-#endif
-
-#if BOARD == BEDROOM3
-const char *deviceName = "bedroom3";
-const char *sensor1 = "bedroom3";
-DHT dht1(D1, DHTTYPE);
-#endif
-
-#if BOARD == CELLAR
-const char *deviceName = "cellar";
-const char *sensor1 = "cellar";
-DHT dht1(D1, DHTTYPE);
-#endif
-
-#if BOARD == STORE
-const char *deviceName = "stora";
-const char *sensor1 = "store_room";
-const char *sensor2 = "store_hall";
-const char *sensor3 = "workshop";
-DHT dht1(D1, DHTTYPE);
-DHT dht2(D2, DHTTYPE);
-DHT dht3(D3, DHTTYPE);
-#define DHT2 1
-#define DHT3 1
-#endif
-
-#if BOARD == HALL
-const char *deviceName = "hall";
-const char *sensor1 = "entry_hall";
-DHT dht1(D1, DHTTYPE);
-#endif
-
-#if BOARD == BATHROOM
-const char *deviceName = "bathroom";
-const char *sensor1 = "bathroom";
-DHT dht1(D1, DHTTYPE);
-#endif
-
-#define SENDMQ 1
+Board *board = NULL;
 
 WiFiClient wifiClient;
 
-#if SENDMQ
-PubSubClient client(wifiClient);
-#endif
-
 long lastMsg = 0;
-char msg[100];
 
 void setup()
 {
@@ -114,89 +37,73 @@ void setup()
 
   wifiManager.autoConnect("AutoConnectAP");
 
-#if SENDMQ
-  client.setServer(MQTT_SERVER, 1883);
-#endif
-
-  dht1.begin();
-
-#if DHT2
-  dht2.begin();
-#endif
-
-#if DHT3
-  dht3.begin();
-#endif
-
-  send();
-}
-
-void sendFields(const char *name, float temp, float hum)
-{
-  snprintf(msg, 100, "{ \"location\": \"%s\", \"temperature\": %f, \"humidity\": %f }", name, temp, hum);
-  Serial.print("Publish message: ");
-  Serial.println(msg);
-
-#if SENDMQ
-  client.publish(MQTT_TOPIC, msg);
-#else
-  Serial.println("MQ not enabled");
-#endif
-}
-
-void send()
-{
-  sendFields(sensor1, dht1.readTemperature(), dht1.readHumidity());
-#if DHT2
-  sendFields(sensor2, dht2.readTemperature(), dht2.readHumidity());
-#endif
-#if DHT3
-  sendFields(sensor3, dht3.readTemperature(), dht3.readHumidity());
-#endif
-}
-
-#if SENDMQ
-void reconnect()
-{
-
-  while (!client.connected())
+  switch (BOARD)
   {
-    Serial.print("Attempting MQTT connection...");
+  case LOUNGE:
+    board = new Board("lounge", wifiClient);
+    board->addSensor(new Sensor("lounge", D1));
+    break;
 
-    String clientId = String("Arduino-DHT-" + String(deviceName));
+  case BEDROOM:
+    board = new Board("bedroom", wifiClient);
+    board->addSensor(new Sensor("bedroom1", D1));
+    board->addSensor(new Sensor("hallway", D2));
+    break;
 
-    if (client.connect(clientId.c_str(), MQTT_USER, MQTT_PASSWORD))
-    {
-      Serial.println("connected");
-    }
-    else
-    {
-      Serial.print("failed, rc=");
-      Serial.print(client.state());
-      Serial.println(" try again in 5 seconds");
-      // Wait 5 seconds before retrying
-      delay(5000);
-    }
+  case KITCHEN:
+    board = new Board("kitchen", wifiClient);
+    board->addSensor(new Sensor("kitchen", D1));
+    board->addSensor(new Sensor("short_hall", D2));
+    break;
+
+  case DINING:
+    board = new Board("dining_room", wifiClient);
+    board->addSensor(new Sensor("dining_room", D1));
+    break;
+
+  case BEDROOM2:
+    board = new Board("bedroom2", wifiClient);
+    board->addSensor(new Sensor("bedroom2", D1));
+    break;
+
+  case BEDROOM3:
+    board = new Board("bedroom3", wifiClient);
+    board->addSensor(new Sensor("bedroom3", D1));
+    break;
+
+  case CELLAR:
+    board = new Board("cellar", wifiClient);
+    board->addSensor(new Sensor("cellar", D1));
+    break;
+
+  case STORE:
+    board = new Board("store", wifiClient);
+    board->addSensor(new Sensor("store_room", D1));
+    board->addSensor(new Sensor("store_hall", D1));
+    board->addSensor(new Sensor("workshop", D1));
+    break;
+
+  case HALL:
+    board = new Board("hall", wifiClient);
+    board->addSensor(new Sensor("entry_hall", D1));
+    break;
+
+  case BATHROOM:
+    board = new Board("bathroom", wifiClient);
+    board->addSensor(new Sensor("bathroom", D1));
+    break;
   }
 }
-#endif
 
 void loop()
 {
-#if SENDMQ
-  if (!client.connected())
-  {
-    reconnect();
-  }
-
-  client.loop();
-#endif
+  board->keepAlive();
 
   long now = millis();
 
   if (now - lastMsg > (60 * 1000))
   {
     lastMsg = now;
-    send();
+    board->publish();
   }
 }
